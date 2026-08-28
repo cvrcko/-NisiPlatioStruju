@@ -5,10 +5,21 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Nisi Platio Struju</title>
 <style>
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07101b;font-family:Arial,sans-serif}canvas{display:block;width:100%;height:100%} .panel{position:fixed;left:0;right:0;top:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(7,16,27,.95);color:#072434} .badge{display:inline-block;background:#e53935;color:#fff;padding:8px 12px;border-radius:12px;margin-bottom:12px;font-weight:700} h1{font-size:48px;line-height:1.03;text-align:center;margin:0} .sub{font-size:18px;color:#072434}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07101b;font-family:Arial,sans-serif}
+canvas{display:block;width:100%;height:100%}
 #hud{position:fixed;left:12px;top:12px;display:flex;gap:12px;background:rgba(255,255,255,.06);padding:8px 12px;border-radius:10px;color:#fff}
-#pause{position:fixed;right:12px;top:12px;padding:8px 12px;border-radius:8px;background:rgba(255,255,255,.06);color:#fff;border:0}
+#pause{position:fixed;right:12px;top:12px;padding:8px 12px;border-radius:8px;background:rgba(255,255,255,.06);color:#fff;border:0;cursor:pointer}
 #lang{padding:6px 8px;font-size:14px;margin-top:12px}
+.panel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(11,55,77,.95);padding:40px;border-radius:12px;text-align:center;z-index:100;border:2px solid #0b9dcc}
+.panel h1{color:#00d9ff;font-size:48px;margin:0 0 20px}
+.panel .badge{background:#ffaa00;color:#000;padding:8px 16px;border-radius:8px;font-weight:bold;display:inline-block;margin-bottom:20px}
+.panel .sub{color:#fff;font-size:18px;margin-bottom:20px}
+.panel button{background:#00d9ff;color:#000;border:0;padding:12px 32px;font-size:16px;font-weight:bold;border-radius:8px;cursor:pointer;margin:8px}
+.panel button:hover{background:#00b8ff}
+.panel .small{color:#888;font-size:12px;margin-top:20px}
+.hidden{display:none !important}
+#final{color:#00d9ff;font-size:16px;margin:15px 0}
 </style>
 </head>
 <body>
@@ -31,54 +42,487 @@
 </div>
 <div id="over" class="panel hidden"><div class="badge">💥 UHVAĆEN SI!</div><h1>GAME OVER</h1><div id="final" class="sub"></div><button id="again">IGRAJ PONOVO</button><button id="home">MENI</button></div>
 <script>
-// --- game variables (kept from original) ---
-const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');let W,H,dpr,ground,player,props,coins,particles,turbines,clouds;let score=0,coinCount=0,lives=3,speed=360,propTimer=0,coinTimer=0,last=0,running=false,paused=false;let best=parseInt(localStorage.getItem('npsBest')||0);
+// --- game state ---
+let running = false, paused = false, last = 0, best = 0;
+const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+let W, H, dpr, ground, player, props, coins, particles, turbines, clouds;
+let score = 0, coinCount = 0, lives = 3, speed = 360, propTimer = 0, coinTimer = 700;
 
 // --- localization data ---
-const translations={
-  sr:{title:'Nisi Platio Struju',menu_badge:'⚡ RAČUN ZA STRUJU',menu_title:'NISI PLATIO\nSTRUJU!',menu_sub:'BEŽI OD PROPELERA VETROTURBINA!',start:'IGRAJ',over_badge:'💥 UHVAĆEN SI!',over_title:'GAME OVER',final:(s,c,b)=>`Rezultat: <b>${s}</b><br>Novčići: <b>${c}</b><br>Najbolji rezultat: <b>${b}</b>`,again:'IGRAJ PONOVO',home:'MENI'},
-  en:{title:"You Didn't Pay the Bill",menu_badge:'⚡ ELECTRIC BILL',menu_title:"YOU DIDN'T\nPAY THE ELECTRICITY!",menu_sub:'AVOID THE WIND TURBINE PROPELLERS!',start:'PLAY',over_badge:'💥 YOU GOT CAUGHT!',over_title:'GAME OVER',final:(s,c,b)=>`Score: <b>${s}</b><br>Coins: <b>${c}</b><br>Best: <b>${b}</b>`,again:'PLAY AGAIN',home:'MENU'},
-  es:{title:'No Pagaste la Luz',menu_badge:'⚡ FACTURA DE LUZ',menu_title:'¡NO PAGASTE\nLA LUZ!',menu_sub:'¡ESCAPA DE LAS HELICES DE LOS AEROGENERADORES!',start:'JUGAR',over_badge:'💥 ¡TE ATRAPARON!',over_title:'FIN DEL JUEGO',final:(s,c,b)=>`Resultado: <b>${s}</b><br>Monedas: <b>${c}</b><br>Mejor: <b>${b}</b>`,again:'JUGAR OTRA VEZ',home:'MENÚ'},
-  de:{title:'Du Hast Nicht Bezahlt',menu_badge:'⚡ STROMRECHNUNG',menu_title:'DU HAST\nDEN STROM NICHT BEZAHLT!',menu_sub:'WEICH DEN PROPELLERN DER WINDRÄDER AUS!',start:'SPIELEN',over_badge:'💥 DU WURDEST GEFANGEN!',over_title:'SPIEL VORBEI',final:(s,c,b)=>`Ergebnis: <b>${s}</b><br>Münzen: <b>${c}</b><br>Bester: <b>${b}</b>`,again:'NOCHMAL SPIELEN',home:'MENÜ'},
-  fr:{title:"Tu N'As Pas Payé",menu_badge:"⚡ FACTURE D'\xC9LECTRICIT\xC9",menu_title:"TU N'AS PAS\nPAYÉ L'\xC9LECTRICITÉ !",menu_sub:'ÉVITE LES HÉLICES DES ÉOLIENNES !',start:'JOUER',over_badge:'💥 TU ES CAPTURÉ !',over_title:'GAME OVER',final:(s,c,b)=>`Résultat : <b>${s}</b><br>Pièces : <b>${c}</b><br>Meilleur : <b>${b}</b>`,again:'REJOUER',home:'MENU'},
-  hr:{title:'Nisi Platio Struju',menu_badge:'⚡ RAČUN ZA STRUJU',menu_title:'NISI PLATIO\nSTRUJU!',menu_sub:'BJEŽI OD PROPELERA VJETROELEKTRANA!',start:'IGRAJ',over_badge:'💥 UHVAĆEN SI!',over_title:'GAME OVER',final:(s,c,b)=>`Rezultat: <b>${s}</b><br>Kovanice: <b>${c}</b><br>Najbolji rezultat: <b>${b}</b>`,again:'IGRAJ PONOVO',home:'MENI'}
+const translations = {
+  sr: {
+    title: 'Nisi Platio Struju',
+    menu_badge: '⚡ RAČUN ZA STRUJU',
+    menu_title: 'NISI PLATIO\nSTRUJU!',
+    menu_sub: 'BEŽI OD PROPELERA VETROTURBINA!',
+    start: 'IGRAJ',
+    over_badge: '💥 UHVAĆEN SI!',
+    over_title: 'GAME OVER',
+    final: (score, coins) => `Rezultat: ${Math.floor(score)} | Novčići: ${coins}`,
+    again: 'IGRAJ PONOVO',
+    home: 'MENI',
+    pause_title: 'PAUZIRANO'
+  },
+  en: {
+    title: "You Didn't Pay the Bill",
+    menu_badge: '⚡ ELECTRIC BILL',
+    menu_title: "YOU DIDN'T\nPAY THE ELECTRICITY!",
+    menu_sub: 'AVOID THE WIND TURBINE PROPELLERS!',
+    start: 'PLAY',
+    over_badge: '💥 YOU GOT CAUGHT!',
+    over_title: 'GAME OVER',
+    final: (score, coins) => `Score: ${Math.floor(score)} | Coins: ${coins}`,
+    again: 'PLAY AGAIN',
+    home: 'MENU',
+    pause_title: 'PAUSED'
+  },
+  es: {
+    title: 'No Pagaste la Luz',
+    menu_badge: '⚡ FACTURA DE LUZ',
+    menu_title: '¡NO PAGASTE\nLA LUZ!',
+    menu_sub: '¡ESCAPA DE LAS HELICES DE LOS AEROGENERADORES!',
+    start: 'JUGAR',
+    over_badge: '💥 ¡TE ATRAPARON!',
+    over_title: 'GAME OVER',
+    final: (score, coins) => `Puntuación: ${Math.floor(score)} | Monedas: ${coins}`,
+    again: 'JUGAR DE NUEVO',
+    home: 'MENÚ',
+    pause_title: 'PAUSA'
+  },
+  de: {
+    title: 'Du Hast Nicht Bezahlt',
+    menu_badge: '⚡ STROMRECHNUNG',
+    menu_title: 'DU HAST\nDEN STROM NICHT BEZAHLT!',
+    menu_sub: 'WEICH DEN PROPELLERN DER WINDRÄDER AUS!',
+    start: 'SPIELEN',
+    over_badge: '💥 DU WURDEST ERWISCHT!',
+    over_title: 'GAME OVER',
+    final: (score, coins) => `Punkte: ${Math.floor(score)} | Münzen: ${coins}`,
+    again: 'NOCHMAL SPIELEN',
+    home: 'MENÜ',
+    pause_title: 'PAUSE'
+  },
+  fr: {
+    title: "Tu N'As Pas Payé",
+    menu_badge: "⚡ FACTURE D'ÉLECTRICITÉ",
+    menu_title: "TU N'AS PAS\nPAYÉ L'ÉLECTRICITÉ !",
+    menu_sub: 'ÉVITE LES HÉLICES DES ÉOLIENNES !',
+    start: 'JOUER',
+    over_badge: '💥 TU T\'ES FAIT ATTRAPER!',
+    over_title: 'GAME OVER',
+    final: (score, coins) => `Score: ${Math.floor(score)} | Pièces: ${coins}`,
+    again: 'REJOUER',
+    home: 'MENU',
+    pause_title: 'PAUSE'
+  },
+  hr: {
+    title: 'Nisi Platio Struju',
+    menu_badge: '⚡ RAČUN ZA STRUJU',
+    menu_title: 'NISI PLATIO\nSTRUJU!',
+    menu_sub: 'BJEŽI OD PROPELERA VJETROELEKTRANA!',
+    start: 'IGRAJ',
+    over_badge: '💥 UHVAĆEN SI!',
+    over_title: 'GAME OVER',
+    final: (score, coins) => `Rezultat: ${Math.floor(score)} | Novčići: ${coins}`,
+    again: 'IGRAJ PONOVO',
+    home: 'MENI',
+    pause_title: 'PAUZIRANA'
+  }
 };
 
 // --- language helpers ---
-function getSavedLang(){return localStorage.getItem('npsLang')||null}
-function detectLang(){const s=getSavedLang(); if(s && translations[s]) return s; const nav=(navigator.language||navigator.userLanguage||'en').slice(0,2); return translations[nav]?nav:'sr'}
-let currentLang=detectLang();
-function t(k,...a){const val=translations[currentLang]&&translations[currentLang][k]; return typeof val==='function'?val(...a):(val||k)}
+function getSavedLang() { return localStorage.getItem('npsLang') || null; }
+function detectLang() {
+  const s = getSavedLang();
+  if (s && translations[s]) return s;
+  const nav = (navigator.language || navigator.userLanguage || 'en').slice(0, 2);
+  return translations[nav] ? nav : 'sr';
+}
+let currentLang = detectLang();
+function t(k, ...a) {
+  const val = translations[currentLang] && translations[currentLang][k];
+  return typeof val === 'function' ? val(...a) : (val || k);
+}
 
 // --- apply translations to DOM ---
-function applyTranslations(){try{document.title=t('title');const menu=document.getElementById('menu');if(menu){const badge=menu.querySelector('.badge');if(badge)badge.textContent=t('menu_badge');const h1=menu.querySelector('h1');if(h1)h1.innerText=t('menu_title');const sub=menu.querySelector('.sub');if(sub)sub.textContent=t('menu_sub');const startBtn=document.getElementById('start');if(startBtn)startBtn.textContent=t('start');}
-const over=document.getElementById('over');if(over){const badge=over.querySelector('.badge');if(badge)badge.textContent=t('over_badge');const h1=over.querySelector('h1');if(h1)h1.textContent=t('over_title');const again=document.getElementById('again');if(again)again.textContent=t('again');const home=document.getElementById('home');if(home)home.textContent=t('home');}
-const bestEl=document.getElementById('best'); if(bestEl) bestEl.textContent=best;}catch(e){console.warn('applyTranslations',e)}}
+function applyTranslations() {
+  try {
+    document.title = t('title');
+    const menu = document.getElementById('menu');
+    if (menu) {
+      const badge = menu.querySelector('.badge');
+      if (badge) badge.textContent = t('menu_badge');
+      const h1 = menu.querySelector('h1');
+      if (h1) h1.textContent = t('menu_title');
+      const sub = menu.querySelector('.sub');
+      if (sub) sub.textContent = t('menu_sub');
+      const btn = menu.querySelector('button');
+      if (btn) btn.textContent = t('start');
+    }
+    const over = document.getElementById('over');
+    if (over) {
+      const badge = over.querySelector('.badge');
+      if (badge) badge.textContent = t('over_badge');
+      const h1 = over.querySelector('h1');
+      if (h1) h1.textContent = t('over_title');
+      const btns = over.querySelectorAll('button');
+      if (btns[0]) btns[0].textContent = t('again');
+      if (btns[1]) btns[1].textContent = t('home');
+    }
+    const bestEl = document.getElementById('best');
+    if (bestEl) bestEl.textContent = best;
+  } catch (e) {
+    console.warn('applyTranslations', e);
+  }
+}
 
 // wire up language selector
-const langSel=document.getElementById('lang'); if(langSel){langSel.value=currentLang; langSel.addEventListener('change',()=>{currentLang=langSel.value; localStorage.setItem('npsLang',currentLang); applyTranslations();})}
+const langSel = document.getElementById('lang');
+if (langSel) {
+  langSel.value = currentLang;
+  langSel.addEventListener('change', () => {
+    currentLang = langSel.value;
+    localStorage.setItem('npsLang', currentLang);
+    applyTranslations();
+  });
+}
 
-// --- original game functions (trimmed for brevity in this commit message) ---
-function resize(){W=innerWidth;H=innerHeight;dpr=Math.min(devicePixelRatio||1,2);canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+'px';canvas.style.height=H+'px';ctx.setTransform(dpr,0,0,dpr,0,0);ground=H-120}
-function world(){turbines=[];for(let i=0;i<5;i++)turbines.push({x:80+i*230,y:ground-(170+(i%3)*35),s:.75+(i%3)*.16,rot:Math.random()*6.28});clouds=[];for(let i=0;i<6;i++)clouds.push({x:Math.random()*W,y:Math.random()*H*0.45+20,s:0.6+Math.random()*0.9})}
-function start(){resize();world();score=0;coinCount=0;lives=3;speed=Math.max(340,W*.72);propTimer=900;coinTimer=700;props=[];coins=[];particles=[];player={x:Math.min(85,W*.18),y:ground-46,size:46,vy:0,onGround:true,inv:0,rot:0};running=true;paused=false;last=performance.now();requestAnimationFrame(loop);applyTranslations()}
-function hud(){document.getElementById('score').textContent=Math.floor(score);document.getElementById('coins').textContent=coinCount;document.getElementById('lives').textContent=lives}
-function jump(){if(!running||paused)return; if(player.onGround){player.vy=-Math.min(820,H*.98);player.onGround=false}else if(player.vy>120)player.vy=-610}
-function spawnProp(){let y=ground-65-Math.random()*210,r=25+Math.random()*16,dir=Math.random()<.5?-1:1;props.push({x:W+70,y,r,rot:Math.random()*6.28,spin:(5+Math.random()*7)*dir,vx:speed*(.86+Math.random()*.32),homeY:y})}
-function spawnCoin(){coins.push({x:W+35,y:ground-75-Math.random()*210,r:10,spin:0})}
-function hit(cx,cy,r,p){let nx=Math.max(p.x,Math.min(cx,p.x+p.size)),ny=Math.max(p.y,Math.min(cy,p.y+p.size));return(cx-nx)**2+(cy-ny)**2<r*r}
-function damage(){if(player.inv>0)return;lives--;player.inv=1.5;for(let i=0;i<22;i++)particles.push({x:player.x+23,y:player.y+23,vx:(Math.random()-.5)*340,vy:(Math.random()-.5)*340,t:1,type:'spark'});if(lives<=0)end()}
-function end(){running=false;let s=Math.floor(score);if(s>best){best=s;localStorage.setItem('npsBest',best)}const finalEl=document.getElementById('final'); if(finalEl) finalEl.innerHTML=t('final',s,coinCount,best); document.getElementById('over').classList.remove('hidden'); document.getElementById('menu').classList.add('hidden')}
-function update(dt){if(paused)return;score+=dt*10;speed+=dt*4.5;player.vy+=1900*dt;player.y+=player.vy*dt;if(player.y+player.size>=ground){player.y=ground-player.size;player.vy=0;player.onGround=true}props.forEach(p=>{p.x-=p.vx*dt;p.rot+=p.spin*dt;if(p.x<-100)p._remove=true});props=props.filter(p=>!p._remove);coins.forEach(c=>{c.x-=speed*dt;if(hit(c.x,c.y,c.r,player)){coinCount++;c._remove=true}});coins=coins.filter(c=>!c._remove);particles.forEach(pa=>{pa.x+=pa.vx*dt;pa.y+=pa.vy*dt;pa.t-=dt});particles=particles.filter(pa=>pa.t>0);hud();}
-function draw(){let g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#5fc7f3');g.addColorStop(.58,'#b9edff');g.addColorStop(1,'#eaf9ff');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);clouds.forEach(c=>{ctx.save();ctx.translate(c.x,c.y);ctx.scale(c.s,c.s);ctx.fillStyle='rgba(255,255,255,.65)';ctx.beginPath();ctx.arc(0,10,24,0,Math.PI*2);ctx.arc(30,-2,32,0,Math.PI*2);ctx.arc(64,10,23,0,Math.PI*2);ctx.fill();ctx.restore()});turbines.forEach(t=>{ctx.save();ctx.translate(t.x,t.y);ctx.scale(t.s,t.s);ctx.fillStyle='#e8edf2';ctx.beginPath();ctx.moveTo(-8,0);ctx.lineTo(8,0);ctx.lineTo(21,190);ctx.lineTo(-21,190);ctx.closePath();ctx.fill();ctx.fillStyle='#cfd6dc';ctx.beginPath();ctx.moveTo(-10,-10);ctx.lineTo(10,-10);ctx.lineTo(21,190);ctx.closePath();ctx.fill();ctx.restore()});props.forEach(p=>{ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.fillStyle='#cfd6dc';ctx.beginPath();ctx.arc(0,0,12,0,Math.PI*2);ctx.fill();for(let i=0;i<3;i++){ctx.rotate(Math.PI*2/3);ctx.fillStyle='#dfe6ec';ctx.beginPath();ctx.roundRect(-6,-2,12,6,3);ctx.fill()}ctx.restore()});requestAnimationFrame(()=>{});}
-function loop(t){if(!running)return;let dt=Math.min((t-last)/1000,.032);last=t;update(dt);draw();requestAnimationFrame(loop)}
+// load best score
+best = parseInt(localStorage.getItem('npsBest') || '0', 10);
+
+// --- game functions ---
+function resize() {
+  W = innerWidth;
+  H = innerHeight;
+  dpr = Math.min(devicePixelRatio || 1, 2);
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ground = H * 0.72;
+}
+
+function world() {
+  turbines = [];
+  for (let i = 0; i < 5; i++) {
+    turbines.push({
+      x: 80 + i * 230,
+      y: ground - (170 + (i % 3) * 35),
+      s: 0.75 + (i % 3) * 0.16,
+      rot: Math.random() * 6.28
+    });
+  }
+  clouds = [];
+  for (let i = 0; i < 6; i++) {
+    clouds.push({
+      x: Math.random() * W,
+      y: 20 + Math.random() * (ground * 0.4),
+      w: 60 + Math.random() * 80,
+      h: 30 + Math.random() * 40,
+      vx: (20 + Math.random() * 40)
+    });
+  }
+}
+
+function start() {
+  resize();
+  world();
+  score = 0;
+  coinCount = 0;
+  lives = 3;
+  speed = Math.max(340, W * 0.72);
+  propTimer = 900;
+  coinTimer = 700;
+  props = [];
+  coins = [];
+  particles = [];
+  player = {
+    x: Math.min(85, W * 0.18),
+    y: ground - 46,
+    size: 46,
+    vy: 0,
+    onGround: true,
+    inv: 0
+  };
+  running = true;
+  paused = false;
+  last = 0;
+  document.getElementById('menu').classList.add('hidden');
+  document.getElementById('over').classList.add('hidden');
+  document.getElementById('hud').classList.remove('hidden');
+  document.getElementById('pause').classList.remove('hidden');
+  hud();
+  requestAnimationFrame(loop);
+}
+
+function hud() {
+  document.getElementById('score').textContent = Math.floor(score);
+  document.getElementById('coins').textContent = coinCount;
+  document.getElementById('lives').textContent = lives;
+}
+
+function jump() {
+  if (!running || paused) return;
+  if (player.onGround) {
+    player.vy = -Math.min(820, H * 0.98);
+    player.onGround = false;
+  } else if (player.vy > 120) {
+    player.vy = -610;
+  }
+}
+
+function spawnProp() {
+  let y = ground - 65 - Math.random() * 210;
+  let r = 25 + Math.random() * 16;
+  let dir = Math.random() < 0.5 ? -1 : 1;
+  props.push({
+    x: W + 70,
+    y: y,
+    r: r,
+    rot: Math.random() * 6.28,
+    spin: (5 + Math.random() * 7) * dir,
+    vx: speed * (0.86 + Math.random() * 0.14)
+  });
+}
+
+function spawnCoin() {
+  coins.push({
+    x: W + 35,
+    y: ground - 75 - Math.random() * 210,
+    r: 10,
+    spin: 0
+  });
+}
+
+function hit(cx, cy, r, p) {
+  let nx = Math.max(p.x, Math.min(cx, p.x + p.size));
+  let ny = Math.max(p.y, Math.min(cy, p.y + p.size));
+  return (cx - nx) ** 2 + (cy - ny) ** 2 < r * r;
+}
+
+function damage() {
+  if (player.inv > 0) return;
+  lives--;
+  player.inv = 1.5;
+  for (let i = 0; i < 22; i++) {
+    particles.push({
+      x: player.x + 23,
+      y: player.y + 23,
+      vx: (Math.random() - 0.5) * 340,
+      vy: (Math.random() - 0.5) * 340,
+      t: 1,
+      type: 'spark'
+    });
+  }
+  if (lives <= 0) end();
+}
+
+function end() {
+  running = false;
+  let s = Math.floor(score);
+  if (s > best) {
+    best = s;
+    localStorage.setItem('npsBest', best);
+  }
+  const finalEl = document.getElementById('final');
+  if (finalEl) finalEl.innerHTML = t('final', s, coinCount);
+  document.getElementById('over').classList.remove('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('pause').classList.add('hidden');
+  applyTranslations();
+}
+
+function update(dt) {
+  if (paused) return;
+  score += dt * 10;
+  speed += dt * 4.5;
+
+  // player physics
+  player.vy += 1900 * dt;
+  player.y += player.vy * dt;
+  if (player.y + player.size >= ground) {
+    player.y = ground - player.size;
+    player.vy = 0;
+    player.onGround = true;
+  }
+  if (player.inv > 0) player.inv -= dt;
+
+  // spawn props
+  propTimer -= dt;
+  if (propTimer <= 0) {
+    spawnProp();
+    propTimer = Math.max(200, 900 - score * 0.02);
+  }
+
+  // spawn coins
+  coinTimer -= dt;
+  if (coinTimer <= 0) {
+    spawnCoin();
+    coinTimer = Math.max(150, 700 - score * 0.015);
+  }
+
+  // update props
+  for (let i = props.length - 1; i >= 0; i--) {
+    props[i].x -= props[i].vx * dt;
+    props[i].rot += props[i].spin * dt;
+    if (hit(props[i].x, props[i].y, props[i].r, player)) {
+      damage();
+      props.splice(i, 1);
+    } else if (props[i].x < -100) {
+      props.splice(i, 1);
+    }
+  }
+
+  // update coins
+  for (let i = coins.length - 1; i >= 0; i--) {
+    coins[i].x -= speed * dt;
+    coins[i].spin += 6 * dt;
+    if (hit(coins[i].x, coins[i].y, coins[i].r, player)) {
+      coinCount++;
+      coins.splice(i, 1);
+    } else if (coins[i].x < -50) {
+      coins.splice(i, 1);
+    }
+  }
+
+  // update particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    particles[i].x += particles[i].vx * dt;
+    particles[i].y += particles[i].vy * dt;
+    particles[i].vy += 400 * dt;
+    particles[i].t -= dt;
+    if (particles[i].t <= 0) particles.splice(i, 1);
+  }
+
+  // update clouds
+  clouds.forEach(c => {
+    c.x -= c.vx * dt;
+    if (c.x < -c.w) c.x = W;
+  });
+
+  hud();
+}
+
+function draw() {
+  // sky gradient
+  let g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#5fc7f3');
+  g.addColorStop(0.58, '#b9edff');
+  g.addColorStop(1, '#eaf9ff');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  // clouds
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  clouds.forEach(c => {
+    ctx.beginPath();
+    ctx.ellipse(c.x + c.w * 0.25, c.y + c.h * 0.5, c.w * 0.4, c.h * 0.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(c.x + c.w * 0.75, c.y + c.h * 0.5, c.w * 0.35, c.h * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // ground
+  ctx.fillStyle = '#4a8c2a';
+  ctx.fillRect(0, ground, W, H - ground);
+
+  // turbines
+  ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+  ctx.lineWidth = 8;
+  turbines.forEach(t => {
+    ctx.save();
+    ctx.translate(t.x, t.y);
+    ctx.scale(t.s, t.s);
+    ctx.rotate(t.rot);
+    ctx.beginPath();
+    ctx.moveTo(-200, 0);
+    ctx.lineTo(200, 0);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, -200);
+    ctx.lineTo(0, 200);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-140, -140);
+    ctx.lineTo(140, 140);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(140, -140);
+    ctx.lineTo(-140, 140);
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  // props
+  ctx.fillStyle = '#ff6b6b';
+  props.forEach(p => {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+    ctx.fillRect(-p.r, -p.r, p.r * 2, p.r * 2);
+    ctx.restore();
+  });
+
+  // coins
+  ctx.fillStyle = '#ffd700';
+  coins.forEach(c => {
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // particles
+  particles.forEach(p => {
+    ctx.fillStyle = `rgba(255,200,0,${p.t})`;
+    ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+  });
+
+  // player
+  ctx.fillStyle = player.inv > 0 && Math.floor(player.inv * 10) % 2 ? 'rgba(100,200,255,0.5)' : '#00d9ff';
+  ctx.fillRect(player.x, player.y, player.size, player.size);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(player.x + 10, player.y + 12, 6, 6);
+  ctx.fillRect(player.x + 30, player.y + 12, 6, 6);
+}
+
+function loop(t) {
+  if (!running) return;
+  let dt = Math.min((t - last) / 1000, 0.032);
+  last = t;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
 
 // input and UI wiring
-canvas.addEventListener('pointerdown',e=>{e.preventDefault();jump()},{passive:false});document.getElementById('start').onclick=start;document.getElementById('again').onclick=start;document.getElementById('home').onclick=()=>{document.getElementById('over').classList.add('hidden');document.getElementById('menu').classList.remove('hidden')}
+canvas.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  jump();
+}, { passive: false });
 
-// initial apply translations
+document.getElementById('start').onclick = start;
+document.getElementById('again').onclick = start;
+document.getElementById('home').onclick = () => {
+  running = false;
+  document.getElementById('over').classList.add('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('pause').classList.add('hidden');
+  document.getElementById('menu').classList.remove('hidden');
+};
+
+document.getElementById('pause').onclick = () => {
+  paused = !paused;
+  document.getElementById('pause').textContent = paused ? '▶' : 'Ⅱ';
+};
+
+window.addEventListener('resize', () => {
+  if (running) resize();
+});
+
+// initial setup
 applyTranslations();
-
 </script>
 </body>
 </html>
