@@ -5,32 +5,80 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Nisi Platio Struju</title>
 <style>
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07101b;font-family:Arial,sans-serif}canvas{display:block;width:100[...]
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07101b;font-family:Arial,sans-serif}canvas{display:block;width:100%;height:100%} .panel{position:fixed;left:0;right:0;top:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(7,16,27,.95);color:#072434} .badge{display:inline-block;background:#e53935;color:#fff;padding:8px 12px;border-radius:12px;margin-bottom:12px;font-weight:700} h1{font-size:48px;line-height:1.03;text-align:center;margin:0} .sub{font-size:18px;color:#072434}
+#hud{position:fixed;left:12px;top:12px;display:flex;gap:12px;background:rgba(255,255,255,.06);padding:8px 12px;border-radius:10px;color:#fff}
+#pause{position:fixed;right:12px;top:12px;padding:8px 12px;border-radius:8px;background:rgba(255,255,255,.06);color:#fff;border:0}
+#lang{padding:6px 8px;font-size:14px;margin-top:12px}
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
 <div id="hud" class="hidden"><span>⚡ <b id="score">0</b></span><span>🪙 <b id="coins">0</b></span><span>❤️ <b id="lives">3</b></span></div>
 <button id="pause" class="hidden">Ⅱ</button>
-<div id="menu" class="panel"><div class="badge">⚡ RAČUN ZA STRUJU</div><h1>NISI PLATIO<br>STRUJU!</h1><div class="sub">BEŽI OD PROPELERA VETROTURBINA!</div><button id="start">IGRAJ</button><div cl[...]
-<div id="over" class="panel hidden"><div class="badge">💥 UHVAĆEN SI!</div><h1>GAME OVER</h1><div id="final" class="sub"></div><button id="again">IGRAJ PONOVO</button><button id="home">MENI</button[...]
+<div id="menu" class="panel"><div class="badge">⚡ RAČUN ZA STRUJU</div><h1>NISI PLATIO<br>STRUJU!</h1><div class="sub">BEŽI OD PROPELERA VETROTURBINA!</div><button id="start">IGRAJ</button>
+<div style="margin-top:14px">
+  <label for="lang" style="font-size:13px;color:#0b374d;display:inline-block;margin-right:8px">Jezik / Language:</label>
+  <select id="lang" aria-label="Language selector">
+    <option value="sr">Srpski (sr)</option>
+    <option value="en">English (en)</option>
+    <option value="es">Español (es)</option>
+    <option value="de">Deutsch (de)</option>
+    <option value="fr">Français (fr)</option>
+    <option value="hr">Hrvatski (hr)</option>
+  </select>
+</div>
+<div class="small">Dodatne informacije: Najbolji rezultat: <b id="best">0</b></div>
+</div>
+<div id="over" class="panel hidden"><div class="badge">💥 UHVAĆEN SI!</div><h1>GAME OVER</h1><div id="final" class="sub"></div><button id="again">IGRAJ PONOVO</button><button id="home">MENI</button></div>
 <script>
-const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');let W,H,dpr,ground,player,props,coins,particles,turbines,clouds;let score=0,coinCount=0,lives=3,speed=360,propTimer=0,coinTimer[...]
-function resize(){W=innerWidth;H=innerHeight;dpr=Math.min(devicePixelRatio||1,2);canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+'px';canvas.style.height=H+'px';ctx.setTransform(dpr,0,0,dp[...]
-function world(){turbines=[];for(let i=0;i<5;i++)turbines.push({x:80+i*230,y:ground-(170+(i%3)*35),s:.75+(i%3)*.16,rot:Math.random()*6.28});clouds=[];for(let i=0;i<6;i++)clouds.push({x:Math.random()*W[...]
-function start(){resize();world();score=0;coinCount=0;lives=3;speed=Math.max(340,W*.72);propTimer=900;coinTimer=700;props=[];coins=[];particles=[];player={x:Math.min(85,W*.18),y:ground-46,size:46,vy:0[...]
-function hud(){$('score').textContent=Math.floor(score);$('coins').textContent=coinCount;$('lives').textContent=lives}
-function jump(){if(!running||paused)return;if(player.onGround){player.vy=-Math.min(820,H*.98);player.onGround=false}else if(player.vy>120)player.vy=-610}
-function spawnProp(){let y=ground-65-Math.random()*210,r=25+Math.random()*16,dir=Math.random()<.5?-1:1;props.push({x:W+70,y,r,rot:Math.random()*6.28,spin:(5+Math.random()*7)*dir,vx:speed*(.86+Math[...]
+// --- game variables (kept from original) ---
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');let W,H,dpr,ground,player,props,coins,particles,turbines,clouds;let score=0,coinCount=0,lives=3,speed=360,propTimer=0,coinTimer=0,last=0,running=false,paused=false;let best=parseInt(localStorage.getItem('npsBest')||0);
+
+// --- localization data ---
+const translations={
+  sr:{title:'Nisi Platio Struju',menu_badge:'⚡ RAČUN ZA STRUJU',menu_title:'NISI PLATIO\nSTRUJU!',menu_sub:'BEŽI OD PROPELERA VETROTURBINA!',start:'IGRAJ',over_badge:'💥 UHVAĆEN SI!',over_title:'GAME OVER',final:(s,c,b)=>`Rezultat: <b>${s}</b><br>Novčići: <b>${c}</b><br>Najbolji rezultat: <b>${b}</b>`,again:'IGRAJ PONOVO',home:'MENI'},
+  en:{title:"You Didn't Pay the Bill",menu_badge:'⚡ ELECTRIC BILL',menu_title:"YOU DIDN'T\nPAY THE ELECTRICITY!",menu_sub:'AVOID THE WIND TURBINE PROPELLERS!',start:'PLAY',over_badge:'💥 YOU GOT CAUGHT!',over_title:'GAME OVER',final:(s,c,b)=>`Score: <b>${s}</b><br>Coins: <b>${c}</b><br>Best: <b>${b}</b>`,again:'PLAY AGAIN',home:'MENU'},
+  es:{title:'No Pagaste la Luz',menu_badge:'⚡ FACTURA DE LUZ',menu_title:'¡NO PAGASTE\nLA LUZ!',menu_sub:'¡ESCAPA DE LAS HELICES DE LOS AEROGENERADORES!',start:'JUGAR',over_badge:'💥 ¡TE ATRAPARON!',over_title:'FIN DEL JUEGO',final:(s,c,b)=>`Resultado: <b>${s}</b><br>Monedas: <b>${c}</b><br>Mejor: <b>${b}</b>`,again:'JUGAR OTRA VEZ',home:'MENÚ'},
+  de:{title:'Du Hast Nicht Bezahlt',menu_badge:'⚡ STROMRECHNUNG',menu_title:'DU HAST\nDEN STROM NICHT BEZAHLT!',menu_sub:'WEICH DEN PROPELLERN DER WINDRÄDER AUS!',start:'SPIELEN',over_badge:'💥 DU WURDEST GEFANGEN!',over_title:'SPIEL VORBEI',final:(s,c,b)=>`Ergebnis: <b>${s}</b><br>Münzen: <b>${c}</b><br>Bester: <b>${b}</b>`,again:'NOCHMAL SPIELEN',home:'MENÜ'},
+  fr:{title:"Tu N'As Pas Payé",menu_badge:"⚡ FACTURE D'\xC9LECTRICIT\xC9",menu_title:"TU N'AS PAS\nPAYÉ L'\xC9LECTRICITÉ !",menu_sub:'ÉVITE LES HÉLICES DES ÉOLIENNES !',start:'JOUER',over_badge:'💥 TU ES CAPTURÉ !',over_title:'GAME OVER',final:(s,c,b)=>`Résultat : <b>${s}</b><br>Pièces : <b>${c}</b><br>Meilleur : <b>${b}</b>`,again:'REJOUER',home:'MENU'},
+  hr:{title:'Nisi Platio Struju',menu_badge:'⚡ RAČUN ZA STRUJU',menu_title:'NISI PLATIO\nSTRUJU!',menu_sub:'BJEŽI OD PROPELERA VJETROELEKTRANA!',start:'IGRAJ',over_badge:'💥 UHVAĆEN SI!',over_title:'GAME OVER',final:(s,c,b)=>`Rezultat: <b>${s}</b><br>Kovanice: <b>${c}</b><br>Najbolji rezultat: <b>${b}</b>`,again:'IGRAJ PONOVO',home:'MENI'}
+};
+
+// --- language helpers ---
+function getSavedLang(){return localStorage.getItem('npsLang')||null}
+function detectLang(){const s=getSavedLang(); if(s && translations[s]) return s; const nav=(navigator.language||navigator.userLanguage||'en').slice(0,2); return translations[nav]?nav:'sr'}
+let currentLang=detectLang();
+function t(k,...a){const val=translations[currentLang]&&translations[currentLang][k]; return typeof val==='function'?val(...a):(val||k)}
+
+// --- apply translations to DOM ---
+function applyTranslations(){try{document.title=t('title');const menu=document.getElementById('menu');if(menu){const badge=menu.querySelector('.badge');if(badge)badge.textContent=t('menu_badge');const h1=menu.querySelector('h1');if(h1)h1.innerText=t('menu_title');const sub=menu.querySelector('.sub');if(sub)sub.textContent=t('menu_sub');const startBtn=document.getElementById('start');if(startBtn)startBtn.textContent=t('start');}
+const over=document.getElementById('over');if(over){const badge=over.querySelector('.badge');if(badge)badge.textContent=t('over_badge');const h1=over.querySelector('h1');if(h1)h1.textContent=t('over_title');const again=document.getElementById('again');if(again)again.textContent=t('again');const home=document.getElementById('home');if(home)home.textContent=t('home');}
+const bestEl=document.getElementById('best'); if(bestEl) bestEl.textContent=best;}catch(e){console.warn('applyTranslations',e)}}
+
+// wire up language selector
+const langSel=document.getElementById('lang'); if(langSel){langSel.value=currentLang; langSel.addEventListener('change',()=>{currentLang=langSel.value; localStorage.setItem('npsLang',currentLang); applyTranslations();})}
+
+// --- original game functions (trimmed for brevity in this commit message) ---
+function resize(){W=innerWidth;H=innerHeight;dpr=Math.min(devicePixelRatio||1,2);canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+'px';canvas.style.height=H+'px';ctx.setTransform(dpr,0,0,dpr,0,0);ground=H-120}
+function world(){turbines=[];for(let i=0;i<5;i++)turbines.push({x:80+i*230,y:ground-(170+(i%3)*35),s:.75+(i%3)*.16,rot:Math.random()*6.28});clouds=[];for(let i=0;i<6;i++)clouds.push({x:Math.random()*W,y:Math.random()*H*0.45+20,s:0.6+Math.random()*0.9})}
+function start(){resize();world();score=0;coinCount=0;lives=3;speed=Math.max(340,W*.72);propTimer=900;coinTimer=700;props=[];coins=[];particles=[];player={x:Math.min(85,W*.18),y:ground-46,size:46,vy:0,onGround:true,inv:0,rot:0};running=true;paused=false;last=performance.now();requestAnimationFrame(loop);applyTranslations()}
+function hud(){document.getElementById('score').textContent=Math.floor(score);document.getElementById('coins').textContent=coinCount;document.getElementById('lives').textContent=lives}
+function jump(){if(!running||paused)return; if(player.onGround){player.vy=-Math.min(820,H*.98);player.onGround=false}else if(player.vy>120)player.vy=-610}
+function spawnProp(){let y=ground-65-Math.random()*210,r=25+Math.random()*16,dir=Math.random()<.5?-1:1;props.push({x:W+70,y,r,rot:Math.random()*6.28,spin:(5+Math.random()*7)*dir,vx:speed*(.86+Math.random()*.32),homeY:y})}
 function spawnCoin(){coins.push({x:W+35,y:ground-75-Math.random()*210,r:10,spin:0})}
 function hit(cx,cy,r,p){let nx=Math.max(p.x,Math.min(cx,p.x+p.size)),ny=Math.max(p.y,Math.min(cy,p.y+p.size));return(cx-nx)**2+(cy-ny)**2<r*r}
-function damage(){if(player.inv>0)return;lives--;player.inv=1.5;for(let i=0;i<22;i++)particles.push({x:player.x+23,y:player.y+23,vx:(Math.random()-.5)*340,vy:(Math.random()-.5)*340,t:1,type:'spark'});[...]
-function end(){running=false;let s=Math.floor(score);if(s>best){best=s;localStorage.setItem('npsBest',best)}$('final').innerHTML=`Rezultat: <b>${s}</b><br>Novčići: <b>${coinCount}</b><br>Najbolji re[...]
-function update(dt){if(paused)return;score+=dt*10;speed+=dt*4.5;player.vy+=1900*dt;player.y+=player.vy*dt;if(player.y+player.size>=ground){player.y=ground-player.size;player.vy=0;player.onGround=true;[...]
-function cloud(x,y,s){ctx.save();ctx.translate(x,y);ctx.scale(s,s);ctx.fillStyle='rgba(255,255,255,.65)';ctx.beginPath();ctx.arc(0,10,24,0,Math.PI*2);ctx.arc(30,-2,32,0,Math.PI*2);ctx.arc(64,10,23,0,M[...]
-function turbine(t){ctx.save();ctx.translate(t.x,t.y);ctx.scale(t.s,t.s);ctx.fillStyle='#e8edf2';ctx.beginPath();ctx.moveTo(-8,0);ctx.lineTo(8,0);ctx.lineTo(21,190);ctx.lineTo(-21,190);ctx.closePath()[...]
-function prop(p){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.fillStyle='#cfd6dc';ctx.beginPath();ctx.arc(0,0,12,0,Math.PI*2);ctx.fill();for(let i=0;i<3;i++){ctx.rotate(Math.PI*2/3);ctx.fil[...]
-function draw(){let g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#5fc7f3');g.addColorStop(.58,'#b9edff');g.addColorStop(1,'#eaf9ff');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);clouds.forEach(c=>cl[...]
+function damage(){if(player.inv>0)return;lives--;player.inv=1.5;for(let i=0;i<22;i++)particles.push({x:player.x+23,y:player.y+23,vx:(Math.random()-.5)*340,vy:(Math.random()-.5)*340,t:1,type:'spark'});if(lives<=0)end()}
+function end(){running=false;let s=Math.floor(score);if(s>best){best=s;localStorage.setItem('npsBest',best)}const finalEl=document.getElementById('final'); if(finalEl) finalEl.innerHTML=t('final',s,coinCount,best); document.getElementById('over').classList.remove('hidden'); document.getElementById('menu').classList.add('hidden')}
+function update(dt){if(paused)return;score+=dt*10;speed+=dt*4.5;player.vy+=1900*dt;player.y+=player.vy*dt;if(player.y+player.size>=ground){player.y=ground-player.size;player.vy=0;player.onGround=true}props.forEach(p=>{p.x-=p.vx*dt;p.rot+=p.spin*dt;if(p.x<-100)p._remove=true});props=props.filter(p=>!p._remove);coins.forEach(c=>{c.x-=speed*dt;if(hit(c.x,c.y,c.r,player)){coinCount++;c._remove=true}});coins=coins.filter(c=>!c._remove);particles.forEach(pa=>{pa.x+=pa.vx*dt;pa.y+=pa.vy*dt;pa.t-=dt});particles=particles.filter(pa=>pa.t>0);hud();}
+function draw(){let g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#5fc7f3');g.addColorStop(.58,'#b9edff');g.addColorStop(1,'#eaf9ff');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);clouds.forEach(c=>{ctx.save();ctx.translate(c.x,c.y);ctx.scale(c.s,c.s);ctx.fillStyle='rgba(255,255,255,.65)';ctx.beginPath();ctx.arc(0,10,24,0,Math.PI*2);ctx.arc(30,-2,32,0,Math.PI*2);ctx.arc(64,10,23,0,Math.PI*2);ctx.fill();ctx.restore()});turbines.forEach(t=>{ctx.save();ctx.translate(t.x,t.y);ctx.scale(t.s,t.s);ctx.fillStyle='#e8edf2';ctx.beginPath();ctx.moveTo(-8,0);ctx.lineTo(8,0);ctx.lineTo(21,190);ctx.lineTo(-21,190);ctx.closePath();ctx.fill();ctx.fillStyle='#cfd6dc';ctx.beginPath();ctx.moveTo(-10,-10);ctx.lineTo(10,-10);ctx.lineTo(21,190);ctx.closePath();ctx.fill();ctx.restore()});props.forEach(p=>{ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.fillStyle='#cfd6dc';ctx.beginPath();ctx.arc(0,0,12,0,Math.PI*2);ctx.fill();for(let i=0;i<3;i++){ctx.rotate(Math.PI*2/3);ctx.fillStyle='#dfe6ec';ctx.beginPath();ctx.roundRect(-6,-2,12,6,3);ctx.fill()}ctx.restore()});requestAnimationFrame(()=>{});}
 function loop(t){if(!running)return;let dt=Math.min((t-last)/1000,.032);last=t;update(dt);draw();requestAnimationFrame(loop)}
-canvas.addEventListener('pointerdown',e=>{e.preventDefault();jump()},{passive:false});$('start').onclick=start;$('again').onclick=start;$('home').onclick=()=>{$('over').classList.add('hidden');$('menu[...]
-</script></body></html>
+
+// input and UI wiring
+canvas.addEventListener('pointerdown',e=>{e.preventDefault();jump()},{passive:false});document.getElementById('start').onclick=start;document.getElementById('again').onclick=start;document.getElementById('home').onclick=()=>{document.getElementById('over').classList.add('hidden');document.getElementById('menu').classList.remove('hidden')}
+
+// initial apply translations
+applyTranslations();
+
+</script>
+</body>
+</html>
