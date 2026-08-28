@@ -40,11 +40,37 @@ canvas{display:block;width:100%;height:100%}
 </div>
 <div class="small">Dodatne informacije: Najbolji rezultat: <b id="best">0</b></div>
 </div>
-<div id="over" class="panel hidden"><div class="badge">💥 UHVAĆEN SI!</div><h1>GAME OVER</h1><div id="final" class="sub"></div><button id="again">IGRAJ PONOVO</button><button id="home">MENI</button></div>
+
+<!-- Fixed/complete "over" panel markup -->
+<div id="over" class="panel hidden" role="dialog" aria-modal="true" aria-labelledby="over-title">
+  <div class="badge">💥 UHVAĆEN SI!</div>
+  <h1 id="over-title">GAME OVER</h1>
+  <div id="final" class="sub"></div>
+  <button id="again">IGRAJ PONOVO</button>
+  <button id="home">MENI</button>
+  <div class="small">Dodatne informacije: Najbolji rezultat: <b id="best-2">0</b></div>
+</div>
+
 <script>
 // --- game state ---
 let running = false, paused = false, last = 0, best = 0;
 const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+
+// --- cache DOM nodes to avoid repeated lookups ---
+const menuEl = document.getElementById('menu');
+const overEl = document.getElementById('over');
+const hudEl = document.getElementById('hud');
+const pauseBtn = document.getElementById('pause');
+const startBtn = document.getElementById('start');
+const againBtn = document.getElementById('again');
+const homeBtn = document.getElementById('home');
+const scoreEl = document.getElementById('score');
+const coinsEl = document.getElementById('coins');
+const livesEl = document.getElementById('lives');
+const bestEl = document.getElementById('best') || document.getElementById('best-2');
+const finalEl = document.getElementById('final');
+const langSel = document.getElementById('lang');
+
 let W, H, dpr, ground, player, props, coins, particles, turbines, clouds;
 let score = 0, coinCount = 0, lives = 3, speed = 360, propTimer = 0, coinTimer = 700;
 
@@ -148,28 +174,24 @@ function t(k, ...a) {
 function applyTranslations() {
   try {
     document.title = t('title');
-    const menu = document.getElementById('menu');
-    if (menu) {
-      const badge = menu.querySelector('.badge');
+    if (menuEl) {
+      const badge = menuEl.querySelector('.badge');
       if (badge) badge.textContent = t('menu_badge');
-      const h1 = menu.querySelector('h1');
+      const h1 = menuEl.querySelector('h1');
       if (h1) h1.textContent = t('menu_title');
-      const sub = menu.querySelector('.sub');
+      const sub = menuEl.querySelector('.sub');
       if (sub) sub.textContent = t('menu_sub');
-      const btn = menu.querySelector('button');
-      if (btn) btn.textContent = t('start');
+      if (startBtn) startBtn.textContent = t('start');
     }
-    const over = document.getElementById('over');
-    if (over) {
-      const badge = over.querySelector('.badge');
+    if (overEl) {
+      const badge = overEl.querySelector('.badge');
       if (badge) badge.textContent = t('over_badge');
-      const h1 = over.querySelector('h1');
+      const h1 = overEl.querySelector('h1');
       if (h1) h1.textContent = t('over_title');
-      const btns = over.querySelectorAll('button');
+      const btns = overEl.querySelectorAll('button');
       if (btns[0]) btns[0].textContent = t('again');
       if (btns[1]) btns[1].textContent = t('home');
     }
-    const bestEl = document.getElementById('best');
     if (bestEl) bestEl.textContent = best;
   } catch (e) {
     console.warn('applyTranslations', e);
@@ -177,7 +199,6 @@ function applyTranslations() {
 }
 
 // wire up language selector
-const langSel = document.getElementById('lang');
 if (langSel) {
   langSel.value = currentLang;
   langSel.addEventListener('change', () => {
@@ -247,19 +268,19 @@ function start() {
   };
   running = true;
   paused = false;
-  last = 0;
-  document.getElementById('menu').classList.add('hidden');
-  document.getElementById('over').classList.add('hidden');
-  document.getElementById('hud').classList.remove('hidden');
-  document.getElementById('pause').classList.remove('hidden');
+  last = performance.now(); // use high-res timestamp for first frame
+  if (menuEl) menuEl.classList.add('hidden');
+  if (overEl) overEl.classList.add('hidden');
+  if (hudEl) hudEl.classList.remove('hidden');
+  if (pauseBtn) pauseBtn.classList.remove('hidden');
   hud();
   requestAnimationFrame(loop);
 }
 
 function hud() {
-  document.getElementById('score').textContent = Math.floor(score);
-  document.getElementById('coins').textContent = coinCount;
-  document.getElementById('lives').textContent = lives;
+  if (scoreEl) scoreEl.textContent = Math.floor(score);
+  if (coinsEl) coinsEl.textContent = coinCount;
+  if (livesEl) livesEl.textContent = lives;
 }
 
 function jump() {
@@ -325,11 +346,10 @@ function end() {
     best = s;
     localStorage.setItem('npsBest', best);
   }
-  const finalEl = document.getElementById('final');
-  if (finalEl) finalEl.innerHTML = t('final', s, coinCount);
-  document.getElementById('over').classList.remove('hidden');
-  document.getElementById('hud').classList.add('hidden');
-  document.getElementById('pause').classList.add('hidden');
+  if (finalEl) finalEl.textContent = t('final', s, coinCount); // safe textContent
+  if (overEl) overEl.classList.remove('hidden');
+  if (hudEl) hudEl.classList.add('hidden');
+  if (pauseBtn) pauseBtn.classList.add('hidden');
   applyTranslations();
 }
 
@@ -502,20 +522,28 @@ canvas.addEventListener('pointerdown', e => {
   jump();
 }, { passive: false });
 
-document.getElementById('start').onclick = start;
-document.getElementById('again').onclick = start;
-document.getElementById('home').onclick = () => {
+if (startBtn) startBtn.onclick = start;
+if (againBtn) againBtn.onclick = start;
+if (homeBtn) homeBtn.onclick = () => {
   running = false;
-  document.getElementById('over').classList.add('hidden');
-  document.getElementById('hud').classList.add('hidden');
-  document.getElementById('pause').classList.add('hidden');
-  document.getElementById('menu').classList.remove('hidden');
+  if (overEl) overEl.classList.add('hidden');
+  if (hudEl) hudEl.classList.add('hidden');
+  if (pauseBtn) pauseBtn.classList.add('hidden');
+  if (menuEl) menuEl.classList.remove('hidden');
 };
 
-document.getElementById('pause').onclick = () => {
+if (pauseBtn) pauseBtn.onclick = () => {
   paused = !paused;
-  document.getElementById('pause').textContent = paused ? '▶' : 'Ⅱ';
+  pauseBtn.textContent = paused ? '▶' : 'Ⅱ';
 };
+
+// pause when tab hidden to keep timing stable / avoid runaway dt
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && running && !paused) {
+    paused = true;
+    if (pauseBtn) pauseBtn.textContent = '▶';
+  }
+});
 
 window.addEventListener('resize', () => {
   if (running) resize();
