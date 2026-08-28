@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Play - Nisi Platio Struju (localized wrapper)</title>
+  <style>body{margin:0;font-family:Arial,sans-serif;background:#07101b;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh}a{color:#4fd1ff}</style>
+</head>
+<body>
+  <div style="max-width:720px;padding:24px;background:#04202a;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.6)">
+    <h2 style="margin-top:0">Play (wrapper)</h2>
+    <p>This page will fetch the HTML game file from the repository, inject a language selector and localization support, and then open the modified game.
+    If the original file moves or the repo is private this will fail. Click below to load the game.</p>
+    <p><button id="run" style="padding:10px 16px;font-size:16px;cursor:pointer">Load game with languages</button></p>
+    <p style="font-size:13px;opacity:.85">If you prefer, you can open the original file directly: <a target="_blank" href="https://github.com/cvrcko/-NisiPlatioStruju/blob/main/%20%20%20%20index.html.html">original file on GitHub</a></p>
+  </div>
+
+<script>
+const srcUrl = 'https://raw.githubusercontent.com/cvrcko/-NisiPlatioStruju/main/%20%20%20%20index.html.html';
+
+function makeLangSelectHtml(){
+  return '\n<div style="margin-top:14px">\n  <label for="lang" style="font-size:13px;color:#0b374d;display:inline-block;margin-right:8px">Jezik / Language:</label>\n  <select id="lang" aria-label="Language selector" style="padding:6px 8px;font-size:14px">\n    <option value="sr">Srpski (sr)</option>\n    <option value="en">English (en)</option>\n    <option value="es">Español (es)</option>\n    <option value="de">Deutsch (de)</option>\n    <option value="fr">Français (fr)</option>\n    <option value="hr">Hrvatski (hr)</option>\n  </select>\n</div>\n';
+}
+
+function makeLocalizationScript(){
+  return `\n<script>\n(function(){\n  const translations = {\n    sr: { title: 'Nisi Platio Struju', menu_badge: '⚡ RAČUN ZA STRUJU', menu_title: 'NISI PLATIO\\nSTRUJU!', menu_sub: 'BEŽI OD PROPELERA VETROTURBINA!', start: 'IGRAJ', over_badge: '💥 UHVAĆEN SI!', over_title: 'GAME OVER', final: (s, coins, best) => \`Rezultat: <b>\${s}</b><br>Novčići: <b>\${coins}</b><br>Najbolji rezultat: <b>\${best}</b>\`, again: 'IGRAJ PONOVO', home: 'MENI' },\n    en: { title: 'You Didn\\'t Pay the Bill', menu_badge: '⚡ ELECTRIC BILL', menu_title: 'YOU DIDN\\'T\\nPAY THE ELECTRICITY!', menu_sub: 'AVOID THE WIND TURBINE PROPELLERS!', start: 'PLAY', over_badge: '💥 YOU GOT CAUGHT!', over_title: 'GAME OVER', final: (s, coins, best) => \`Score: <b>\${s}</b><br>Coins: <b>\${coins}</b><br>Best: <b>\${best}</b>\`, again: 'PLAY AGAIN', home: 'MENU' },\n    es: { title: 'No Pagaste la Luz', menu_badge: '⚡ FACTURA DE LUZ', menu_title: '¡NO PAGASTE\\nLA LUZ!', menu_sub: '¡ESCAPA DE LAS HELICES DE LOS AEROGENERADORES!', start: 'JUGAR', over_badge: '💥 ¡TE ATRAPARON!', over_title: 'FIN DEL JUEGO', final: (s, coins, best) => \`Resultado: <b>\${s}</b><br>Monedas: <b>\${coins}</b><br>Mejor: <b>\${best}</b>\`, again: 'JUGAR OTRA VEZ', home: 'MENÚ' },\n    de: { title: 'Du Hast Nicht Bezahlt', menu_badge: '⚡ STROMRECHNUNG', menu_title: 'DU HAST\\nDEN STROM NICHT BEZAHLT!', menu_sub: 'WEICH DEN PROPELLERN DER WINDRÄDER AUS!', start: 'SPIELEN', over_badge: '💥 DU WURDEST GEFANGEN!', over_title: 'SPIEL VORBEI', final: (s, coins, best) => \`Ergebnis: <b>\${s}</b><br>Münzen: <b>\${coins}</b><br>Bester: <b>\${best}</b>\`, again: 'NOCHMAL SPIELEN', home: 'MENÜ' },\n    fr: { title: 'Tu N\\'as Pas Payé', menu_badge: '⚡ FACTURE D\\'ÉLECTRICITÉ', menu_title: 'TU N\\'AS PAS\\nPAYÉ L\\'ÉLECTRICITÉ !', menu_sub: 'ÉVITE LES HÉLICES DES ÉOLIENNES !', start: 'JOUER', over_badge: '💥 TU ES CAPTURÉ !', over_title: 'GAME OVER', final: (s, coins, best) => \`Résultat : <b>\${s}</b><br>Pièces : <b>\${coins}</b><br>Meilleur : <b>\${best}</b>\`, again: 'REJOUER', home: 'MENU' },\n    hr: { title: 'Nisi Platio Struju', menu_badge: '⚡ RAČUN ZA STRUJU', menu_title: 'NISI PLATIO\\nSTRUJU!', menu_sub: 'BJEŽI OD PROPELERA VJETROELEKTRANA!', start: 'IGRAJ', over_badge: '💥 UHVAĆEN SI!', over_title: 'GAME OVER', final: (s, coins, best) => \`Rezultat: <b>\${s}</b><br>Kovanice: <b>\${coins}</b><br>Najbolji rezultat: <b>\${best}</b>\`, again: 'IGRAJ PONOVO', home: 'MENI' }\n  };\n\n  function getSavedLang(){return localStorage.getItem('npsLang')||null;}\n  function detectLang(){const saved=getSavedLang(); if(saved && translations[saved]) return saved; const nav=(navigator.language||navigator.userLanguage||'en').slice(0,2); if(translations[nav]) return nav; return 'sr';}\n  function t(key,...args){const lang=currentLang; const val=translations[lang] && translations[lang][key]; if(!val) return key; return (typeof val==='function')?val(...args):val;}\n\n  let currentLang = detectLang();\n\n  function applyTranslations(){ try{ document.title = t('title'); const menu = document.getElementById('menu'); if(menu){ const badge = menu.querySelector('.badge'); if(badge) badge.textContent = t('menu_badge'); const h1 = menu.querySelector('h1'); if(h1) h1.innerText = t('menu_title'); const sub = menu.querySelector('.sub'); if(sub) sub.textContent = t('menu_sub'); const startBtn = document.getElementById('start'); if(startBtn) startBtn.textContent = t('start'); } const over = document.getElementById('over'); if(over){ const badge = over.querySelector('.badge'); if(badge) badge.textContent = t('over_badge'); const h1 = over.querySelector('h1'); if(h1) h1.textContent = t('over_title'); const again = document.getElementById('again'); if(again) again.textContent = t('again'); const home = document.getElementById('home'); if(home) home.textContent = t('home'); } }catch(e){console.warn('applyTranslations failed',e);} }\n\n  // When the game script is already loaded, we can wire-up the lang selector (if present) and patch end()\n  function wireUpLangSelector(){ const sel = document.getElementById('lang'); if(!sel) return; sel.value = currentLang; sel.addEventListener('change', ()=>{ currentLang = sel.value; localStorage.setItem('npsLang', currentLang); applyTranslations(); }); }
+\n  // Patch end() to replace final text with localized version after game ends\n  function patchEnd(){ if(typeof window.end==='function'){ const orig = window.end; window.end = function(){ try{ orig(); }catch(e){ console.warn('orig end failed',e); } try{ const s = Math.floor(window.score||0); const coins = window.coinCount||0; const best = parseInt(localStorage.getItem('npsBest')||0); const el = document.getElementById('final'); if(el) el.innerHTML = t('final', s, coins, best); }catch(e){console.warn('localize final failed',e);} }; } else { // try again shortly if end not yet defined
+      setTimeout(patchEnd,300);
+    }
+  }
+
+  // run when DOM is ready
+  function initAfterLoad(){ applyTranslations(); wireUpLangSelector(); patchEnd(); }
+  if(document.readyState==='complete' || document.readyState==='interactive') initAfterLoad(); else document.addEventListener('DOMContentLoaded', initAfterLoad);
+})();\n<\/script>\n`;
+}
+
+async function loadAndInject(){
+  try{
+    const res = await fetch(srcUrl);
+    if(!res.ok) throw new Error('Failed to fetch original file: '+res.status);
+    let html = await res.text();
+
+    // Insert language selector after the start button inside #menu
+    // We'll look for the first occurrence of '<button id="start"' and insert after its closing </button>
+    const startBtnRegex = /(<button\s+id=["']start["'][^>]*>[\s\S]*?<\/button>)/i;
+    if(startBtnRegex.test(html)){
+      html = html.replace(startBtnRegex, (m)=> m + makeLangSelectHtml());
+    } else {
+      // fallback: insert selector before closing </div> of #menu
+      html = html.replace(/(<div\s+id=["']menu["'][\s\S]*?<\/div>)/i, (m)=> m.replace(/<\/div>\s*$/, makeLangSelectHtml() + '</div>'));
+    }
+
+    // Inject localization script before </body>
+    html = html.replace(/<\/body>/i, makeLocalizationScript() + '\n</body>');
+
+    // Serve the modified HTML by replacing current document
+    document.open();
+    document.write(html);
+    document.close();
+  }catch(err){
+    document.body.innerHTML = '<div style="padding:20px;color:#fff">Error loading game: '+err.message+'<br><br>Try opening the original file directly: <a href="https://github.com/cvrcko/-NisiPlatioStruju/blob/main/%20%20%20%20index.html.html" target="_blank">original</a></div>';
+    console.error(err);
+  }
+}
+
+document.getElementById('run').addEventListener('click', loadAndInject);
+</script>
+
+</body>
+</html>
