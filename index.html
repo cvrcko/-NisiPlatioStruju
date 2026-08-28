@@ -1,36 +1,36 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="sr">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Nisi Platio Struju — Load Original</title>
-  <style>body{margin:0;font-family:Arial,sans-serif;background:#07101b;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh}a{color:#4fd1ff}</style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Nisi Platio Struju</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07101b;font-family:Arial,sans-serif}canvas{display:block;width:100[...]
+</style>
 </head>
 <body>
-  <div style="max-width:720px;padding:24px;background:#04202a;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.6);text-align:left">
-    <h2 style="margin-top:0">Nisi Platio Struju — Loader</h2>
-    <p>This page directly loads the original game file and replaces this document with it. It avoids the filename with leading spaces so the game is available at /index.html.</p>
-    <p><button id="load" style="padding:10px 16px;font-size:16px;cursor:pointer">Load original game</button></p>
-    <p style="font-size:13px;opacity:.85">Original file location: <a target="_blank" href="https://github.com/cvrcko/-NisiPlatioStruju/blob/main/%20%20%20%20index.html.html">    index.html.html</a></p>
-  </div>
-
+<canvas id="game"></canvas>
+<div id="hud" class="hidden"><span>⚡ <b id="score">0</b></span><span>🪙 <b id="coins">0</b></span><span>❤️ <b id="lives">3</b></span></div>
+<button id="pause" class="hidden">Ⅱ</button>
+<div id="menu" class="panel"><div class="badge">⚡ RAČUN ZA STRUJU</div><h1>NISI PLATIO<br>STRUJU!</h1><div class="sub">BEŽI OD PROPELERA VETROTURBINA!</div><button id="start">IGRAJ</button><div cl[...]
+<div id="over" class="panel hidden"><div class="badge">💥 UHVAĆEN SI!</div><h1>GAME OVER</h1><div id="final" class="sub"></div><button id="again">IGRAJ PONOVO</button><button id="home">MENI</button[...]
 <script>
-const RAW = 'https://raw.githubusercontent.com/cvrcko/-NisiPlatioStruju/main/%20%20%20%20index.html.html';
-async function loadOriginal(){
-  try{
-    const res = await fetch(RAW);
-    if(!res.ok) throw new Error('Fetch failed: '+res.status);
-    const html = await res.text();
-    document.open();
-    document.write(html);
-    document.close();
-  }catch(err){
-    document.body.innerHTML = '<div style="padding:20px;color:#fff">Error loading original game: '+err.message+'<br><br>Open original file on GitHub: <a href="https://github.com/cvrcko/-NisiPlatioStruju/blob/main/%20%20%20%20index.html.html" target="_blank">original</a></div>';
-  }
-}
-document.getElementById('load').addEventListener('click',loadOriginal);
-// Auto-load for convenience
-loadOriginal();
-</script>
-</body>
-</html>
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');let W,H,dpr,ground,player,props,coins,particles,turbines,clouds;let score=0,coinCount=0,lives=3,speed=360,propTimer=0,coinTimer[...]
+function resize(){W=innerWidth;H=innerHeight;dpr=Math.min(devicePixelRatio||1,2);canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+'px';canvas.style.height=H+'px';ctx.setTransform(dpr,0,0,dp[...]
+function world(){turbines=[];for(let i=0;i<5;i++)turbines.push({x:80+i*230,y:ground-(170+(i%3)*35),s:.75+(i%3)*.16,rot:Math.random()*6.28});clouds=[];for(let i=0;i<6;i++)clouds.push({x:Math.random()*W[...]
+function start(){resize();world();score=0;coinCount=0;lives=3;speed=Math.max(340,W*.72);propTimer=900;coinTimer=700;props=[];coins=[];particles=[];player={x:Math.min(85,W*.18),y:ground-46,size:46,vy:0[...]
+function hud(){$('score').textContent=Math.floor(score);$('coins').textContent=coinCount;$('lives').textContent=lives}
+function jump(){if(!running||paused)return;if(player.onGround){player.vy=-Math.min(820,H*.98);player.onGround=false}else if(player.vy>120)player.vy=-610}
+function spawnProp(){let y=ground-65-Math.random()*210,r=25+Math.random()*16,dir=Math.random()<.5?-1:1;props.push({x:W+70,y,r,rot:Math.random()*6.28,spin:(5+Math.random()*7)*dir,vx:speed*(.86+Math[...]
+function spawnCoin(){coins.push({x:W+35,y:ground-75-Math.random()*210,r:10,spin:0})}
+function hit(cx,cy,r,p){let nx=Math.max(p.x,Math.min(cx,p.x+p.size)),ny=Math.max(p.y,Math.min(cy,p.y+p.size));return(cx-nx)**2+(cy-ny)**2<r*r}
+function damage(){if(player.inv>0)return;lives--;player.inv=1.5;for(let i=0;i<22;i++)particles.push({x:player.x+23,y:player.y+23,vx:(Math.random()-.5)*340,vy:(Math.random()-.5)*340,t:1,type:'spark'});[...]
+function end(){running=false;let s=Math.floor(score);if(s>best){best=s;localStorage.setItem('npsBest',best)}$('final').innerHTML=`Rezultat: <b>${s}</b><br>Novčići: <b>${coinCount}</b><br>Najbolji re[...]
+function update(dt){if(paused)return;score+=dt*10;speed+=dt*4.5;player.vy+=1900*dt;player.y+=player.vy*dt;if(player.y+player.size>=ground){player.y=ground-player.size;player.vy=0;player.onGround=true;[...]
+function cloud(x,y,s){ctx.save();ctx.translate(x,y);ctx.scale(s,s);ctx.fillStyle='rgba(255,255,255,.65)';ctx.beginPath();ctx.arc(0,10,24,0,Math.PI*2);ctx.arc(30,-2,32,0,Math.PI*2);ctx.arc(64,10,23,0,M[...]
+function turbine(t){ctx.save();ctx.translate(t.x,t.y);ctx.scale(t.s,t.s);ctx.fillStyle='#e8edf2';ctx.beginPath();ctx.moveTo(-8,0);ctx.lineTo(8,0);ctx.lineTo(21,190);ctx.lineTo(-21,190);ctx.closePath()[...]
+function prop(p){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.fillStyle='#cfd6dc';ctx.beginPath();ctx.arc(0,0,12,0,Math.PI*2);ctx.fill();for(let i=0;i<3;i++){ctx.rotate(Math.PI*2/3);ctx.fil[...]
+function draw(){let g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#5fc7f3');g.addColorStop(.58,'#b9edff');g.addColorStop(1,'#eaf9ff');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);clouds.forEach(c=>cl[...]
+function loop(t){if(!running)return;let dt=Math.min((t-last)/1000,.032);last=t;update(dt);draw();requestAnimationFrame(loop)}
+canvas.addEventListener('pointerdown',e=>{e.preventDefault();jump()},{passive:false});$('start').onclick=start;$('again').onclick=start;$('home').onclick=()=>{$('over').classList.add('hidden');$('menu[...]
+</script></body></html>
